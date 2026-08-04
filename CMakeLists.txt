@@ -98,14 +98,14 @@ endif()
 set(QWINDOWKIT_VERSION ${PROJECT_VERSION})
 set(QWINDOWKIT_INSTALL_NAME ${PROJECT_NAME})
 
-string(TIMESTAMP _QWINDOWKIT_CURRENT_YEAR "%Y")
-set(QWINDOWKIT_COPYRIGHT "Copyright 2023-${_QWINDOWKIT_CURRENT_YEAR} Stdware Collections")
+set(QWINDOWKIT_COPYRIGHT "Copyright 2023-present Stdware Collections")
 set(QWINDOWKIT_DESCRIPTION ${PROJECT_DESCRIPTION})
 
 # ----------------------------------
 # Find basic dependencies
 # ----------------------------------
-find_package(qmsetup QUIET)
+# `qmsetup` runs on the build machine, so it is never searched in the target sysroot
+find_package(qmsetup QUIET NO_CMAKE_FIND_ROOT_PATH)
 
 if(NOT TARGET qmsetup::library)
     # Modify this variable according to your project structure
@@ -116,7 +116,7 @@ if(NOT TARGET qmsetup::library)
 
     # Install package in place
     set(_package_path)
-    qm_install_package(qmsetup
+    qm_install_package(qmsetup HOST
         SOURCE_DIR ${_source_dir}
         CMAKE_PACKAGE_SUBDIR lib/cmake/qmsetup
         CONFIGURE_ARGS -DCMAKE_INSTALL_LIBDIR=lib
@@ -125,7 +125,9 @@ if(NOT TARGET qmsetup::library)
     )
 
     # Find package again
-    find_package(qmsetup REQUIRED PATHS ${_package_path})
+    find_package(qmsetup REQUIRED PATHS ${_package_path}
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+    )
 
     # Update import path
     set(qmsetup_DIR ${_package_path} CACHE PATH "" FORCE)
