@@ -401,9 +401,7 @@ namespace QWK {
         if (((message >= WM_NCCREATE) && (message <= WM_NCACTIVATE)) ||
             ((message >= WM_NCMOUSEMOVE) && (message <= WM_NCMBUTTONDBLCLK)) ||
             ((message >= WM_NCXBUTTONDOWN) && (message <= WM_NCXBUTTONDBLCLK))
-#if (WINVER >= _WIN32_WINNT_WIN8)
             || ((message >= WM_NCPOINTERUPDATE) && (message <= WM_NCPOINTERUP))
-#endif
             || ((message == WM_NCMOUSEHOVER) || (message == WM_NCMOUSELEAVE))) {
             return true;
         } else {
@@ -679,6 +677,16 @@ namespace QWK {
         Q_ASSERT(hWnd);
         Q_ASSERT(ctx);
 
+        // Qt creates a decorated HWND from its requested client geometry before
+        // we install the NCCALCSIZE hook. Removing the non-client area while
+        // keeping that HWND's size would turn the old frame into extra client
+        // pixels, on both the first setup and every subsequent recreation.
+        RECT clientRect{};
+        RECT frameRect{};
+        const bool preserveClientGeometry = !isSystemBorderEnabled() &&
+            ::GetClientRect(hWnd, &clientRect) &&
+            ::GetWindowRect(hWnd, &frameRect);
+
         if (isSystemBorderEnabled()) {
             // Inform Qt we want and have set custom margins
             setInternalWindowFrameMargins(window, QMargins(0, -getTitleBarHeight(hWnd), 0, 0));
@@ -701,7 +709,13 @@ namespace QWK {
         // Force a WM_NCCALCSIZE message manually to avoid the title bar become visible
         // while Qt is re-creating the window (such as setWindowFlag(s) calls). It has
         // been observed by our users.
-        triggerFrameChange(hWnd);
+        if (preserveClientGeometry && isWindowNoState(hWnd)) {
+            ::SetWindowPos(hWnd, nullptr, frameRect.left, frameRect.top,
+                           RECT_WIDTH(clientRect), RECT_HEIGHT(clientRect),
+                           SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        } else {
+            triggerFrameChange(hWnd);
+        }
     }
 
     static inline void removeManagedWindow(HWND hWnd) {
